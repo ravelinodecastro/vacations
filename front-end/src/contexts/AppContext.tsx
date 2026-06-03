@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useState,
   type ReactNode,
 } from 'react';
@@ -40,8 +41,6 @@ interface AppContextType {
   employees: Employee[];
   vacationRequests: VacationRequest[];
   currentUser: Employee;
-  currentUserId: number;
-  setCurrentUserId: (id: number) => void;
 
   createEmployee: (data: CreateEmployeeData) => OpResult;
   updateEmployee: (id: number, data: Partial<CreateEmployeeData>) => OpResult;
@@ -56,12 +55,20 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-export function AppProvider({ children }: { children: ReactNode }) {
+interface AppProviderProps {
+  children: ReactNode;
+  sessionRole: Role;
+}
+
+export function AppProvider({ children, sessionRole }: AppProviderProps) {
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
   const [vacationRequests, setVacationRequests] = useState<VacationRequest[]>(INITIAL_REQUESTS);
-  const [currentUserId, setCurrentUserId] = useState<number>(1);
 
-  const currentUser = employees.find(e => e.id === currentUserId) ?? employees[0];
+  // Derive the current user from the session role — always the first employee of that role.
+  const currentUser = useMemo<Employee>(
+    () => employees.find(e => e.role === sessionRole) ?? employees[0],
+    [employees, sessionRole],
+  );
 
   const createEmployee = useCallback(
     (data: CreateEmployeeData): OpResult => {
@@ -159,8 +166,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         employees,
         vacationRequests,
         currentUser,
-        currentUserId,
-        setCurrentUserId,
         createEmployee,
         updateEmployee,
         deleteEmployee,

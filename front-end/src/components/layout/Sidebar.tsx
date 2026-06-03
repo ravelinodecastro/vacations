@@ -1,18 +1,29 @@
 'use client';
 
 import { useApp } from '@/contexts/AppContext';
-import { ROLE_LABELS } from '@/lib/constants';
-import { Avatar } from '@/components/ui/Avatar';
 import { RoleBadge } from '@/components/ui/RoleBadge';
+import { Avatar } from '@/components/ui/Avatar';
 import { NavItem } from './NavItem';
+import type { Role } from '@/types';
 
-export function Sidebar() {
-  const { employees, vacationRequests, currentUser, currentUserId, setCurrentUserId } = useApp();
+interface SessionUser {
+  name: string;
+  email: string;
+  role: Role;
+}
+
+interface Props {
+  sessionUser: SessionUser;
+  onSignOut: () => Promise<void>;
+}
+
+export function Sidebar({ sessionUser, onSignOut }: Props) {
+  const { employees, vacationRequests, currentUser } = useApp();
 
   const pendingCount = vacationRequests.filter(r => {
     if (r.status !== 'pending') return false;
-    if (currentUser.role === 'admin') return true;
-    if (currentUser.role === 'manager') {
+    if (sessionUser.role === 'admin') return true;
+    if (sessionUser.role === 'manager') {
       return employees.find(e => e.id === r.employeeId)?.managerId === currentUser.id;
     }
     return false;
@@ -21,7 +32,7 @@ export function Sidebar() {
   const navItems = [
     { href: '/dashboard',      label: 'Dashboard',      icon: '⊞' },
     { href: '/vacations',      label: 'Férias',         icon: '🗓' },
-    ...(currentUser.role !== 'collaborator'
+    ...(sessionUser.role !== 'collaborator'
       ? [{ href: '/collaborators', label: 'Colaboradores', icon: '👥' }]
       : []),
   ];
@@ -41,24 +52,6 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* User switcher */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-          Atuar como
-        </p>
-        <select
-          value={currentUserId}
-          onChange={e => setCurrentUserId(Number(e.target.value))}
-          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-800 bg-gray-50 cursor-pointer focus:outline-none"
-        >
-          {employees.map(e => (
-            <option key={e.id} value={e.id}>
-              {e.name} ({ROLE_LABELS[e.role]})
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Navigation */}
       <nav className="flex-1 p-2.5 space-y-0.5">
         {navItems.map(item => (
@@ -73,12 +66,24 @@ export function Sidebar() {
       </nav>
 
       {/* Current user footer */}
-      <div className="px-4 py-3.5 border-t border-gray-200 flex items-center gap-2.5">
-        <Avatar name={currentUser.name} />
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{currentUser.name}</p>
-          <RoleBadge role={currentUser.role} />
+      <div className="border-t border-gray-200">
+        <div className="px-4 py-3.5 flex items-center gap-2.5">
+          <Avatar name={sessionUser.name} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-gray-900 truncate">{sessionUser.name}</p>
+            <RoleBadge role={sessionUser.role} />
+          </div>
         </div>
+
+        {/* Sign out */}
+        <form action={onSignOut} className="px-4 pb-4">
+          <button
+            type="submit"
+            className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
+          >
+            ↩ Terminar sessão
+          </button>
+        </form>
       </div>
     </aside>
   );

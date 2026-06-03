@@ -7,6 +7,7 @@
             "enabled": true,
             "emailVerified": true,
             "firstName": "Admin",
+            "lastName": "Admin",
             "email": "admin@lbc.com",
             "attributes": {},
             "credentials": [
@@ -25,6 +26,7 @@
             "enabled": true,
             "emailVerified": true,
             "firstName": "Manager",
+            "lastName": "Manager",
             "email": "manager@lbc.com",
             "attributes": {},
             "credentials": [
@@ -43,6 +45,7 @@
             "enabled": true,
             "emailVerified": true,
             "firstName": "Collaborator",
+            "lastName": "Collaborator",
             "email": "collaborator@lbc.com",
             "attributes": {},
             "credentials": [
@@ -80,7 +83,7 @@
             "publicClient": true,
             "protocol": "openid-connect",
             "redirectUris": [
-                "+"
+                "*"
             ],
             "webOrigins": [
                 "*"
