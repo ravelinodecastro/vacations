@@ -1,0 +1,90 @@
+{
+    "realm": "lbc",
+    "enabled": true,
+    "users": [
+        {
+            "username": "admin",
+            "enabled": true,
+            "emailVerified": true,
+            "firstName": "Admin",
+            "email": "admin@lbc.com",
+            "attributes": {},
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "qwerty",
+                    "temporary": false
+                }
+            ],
+            "realmRoles": [
+                "Admin"
+            ]
+        },
+        {
+            "username": "manager",
+            "enabled": true,
+            "emailVerified": true,
+            "firstName": "Manager",
+            "email": "manager@lbc.com",
+            "attributes": {},
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "qwerty",
+                    "temporary": false
+                }
+            ],
+            "realmRoles": [
+                "Manager"
+            ]
+        },
+        {
+            "username": "collaborator",
+            "enabled": true,
+            "emailVerified": true,
+            "firstName": "Collaborator",
+            "email": "collaborator@lbc.com",
+            "attributes": {},
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "qwerty",
+                    "temporary": false
+                }
+            ],
+            "realmRoles": [
+                "Collaborator"
+            ]
+        }
+    ],
+    "roles": {
+        "realm": [
+            {
+                "name": "Admin",
+                "description": "Admin"
+            },
+            {
+                "name": "Manager",
+                "description": "Manager"
+            },
+            {
+                "name": "Collaborator",
+                "description": "Collaborator"
+            }
+        ]
+    },
+    "clients": [
+        {
+            "clientId": "vacations",
+            "enabled": true,
+            "publicClient": true,
+            "protocol": "openid-connect",
+            "redirectUris": [
+                "+"
+            ],
+            "webOrigins": [
+                "*"
+            ]
+        }
+    ]
+}
