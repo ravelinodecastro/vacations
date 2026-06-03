@@ -39,6 +39,18 @@ services:
     depends_on:
       - keycloak
       - postgres
+  nextjs:
+    build:
+      context: ./front-end
+      dockerfile: Dockerfile
+    container_name: nextjs-app
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    depends_on:
+      - back
 
 volumes:
   postgres_data:
