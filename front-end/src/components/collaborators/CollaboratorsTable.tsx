@@ -1,35 +1,40 @@
 'use client';
 
-import { useState } from 'react';
-import { useApp } from '@/contexts/AppContext';
+import { useState, useTransition } from 'react';
 import type { Employee } from '@/types';
+import { deleteEmployeeAction } from '@/actions/employees';
 import { Avatar } from '@/components/ui/Avatar';
-import { RoleBadge } from '@/components/ui/RoleBadge';
 import { Button } from '@/components/ui/Button';
 import { CollaboratorForm } from './CollaboratorForm';
 import { CollaboratorDetail } from './CollaboratorDetail';
 
-export function CollaboratorsTable() {
-  const { employees, currentUser, deleteEmployee } = useApp();
+interface Props {
+  employees: Employee[];
+  fetchError: string | null;
+}
+
+export function CollaboratorsTable({ employees, fetchError }: Props) {
   const [search, setSearch] = useState('');
   const [formTarget, setFormTarget] = useState<Employee | null | 'new'>(null);
   const [detailTarget, setDetailTarget] = useState<Employee | null>(null);
-
-  const isAdmin = currentUser.role === 'admin';
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const visible = employees.filter(e => {
-    if (currentUser.role === 'collaborator') return e.id === currentUser.id;
-    if (currentUser.role === 'manager') {
-      return e.managerId === currentUser.id || e.id === currentUser.id;
-    }
     const q = search.toLowerCase();
     return e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
   });
 
-  function handleDelete(id: number) {
-    if (window.confirm('Remover este colaborador? Os seus pedidos de férias também serão removidos.')) {
-      deleteEmployee(id);
-    }
+  // All employees are potential managers (backend doesn't restrict by role)
+  const potentialManagers = employees;
+
+  function handleDelete(id: string, name: string) {
+    if (!window.confirm(`Remover "${name}"?`)) return;
+    setActionError(null);
+    startTransition(async () => {
+      const result = await deleteEmployeeAction(id);
+      if (result.error) setActionError(result.error);
+    });
   }
 
   return (
@@ -41,27 +46,29 @@ export function CollaboratorsTable() {
             {visible.length} utilizador{visible.length !== 1 ? 'es' : ''}
           </p>
         </div>
-        {isAdmin && (
-          <Button variant="primary" onClick={() => setFormTarget('new')}>
-            + Novo Colaborador
-          </Button>
-        )}
+        <Button variant="primary" onClick={() => setFormTarget('new')}>
+          + Novo Colaborador
+        </Button>
       </div>
 
-      {isAdmin && (
-        <input
-          placeholder="Pesquisar por nome ou email..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800 mb-5 focus:outline-none focus:ring-1 focus:ring-brand"
-        />
+      {(fetchError || actionError) && (
+        <div className="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {fetchError ?? actionError}
+        </div>
       )}
+
+      <input
+        placeholder="Pesquisar por nome ou email..."
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        className="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800 mb-5 focus:outline-none focus:ring-1 focus:ring-brand"
+      />
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-50">
-              {['Nome', 'Email', 'Função', 'Manager', 'Ações'].map(h => (
+              {['Nome', 'Email', 'Manager', 'Ações'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200"
@@ -74,44 +81,37 @@ export function CollaboratorsTable() {
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
-                  Nenhum colaborador encontrado.
+                <td colSpan={4} className="px-4 py-10 text-center text-sm text-gray-400">
+                  {fetchError ? 'Erro ao carregar.' : 'Nenhum colaborador encontrado.'}
                 </td>
               </tr>
             ) : (
-              visible.map((e, i) => {
-                const manager = employees.find(m => m.id === e.managerId);
-                return (
-                  <tr key={e.id} className={i < visible.length - 1 ? 'border-b border-gray-100' : ''}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={e.name} />
-                        <span className="text-sm font-medium text-gray-900">{e.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{e.email}</td>
-                    <td className="px-4 py-3">
-                      <RoleBadge role={e.role} />
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{manager?.name ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => setDetailTarget(e)}>Ver</Button>
-                        {isAdmin && (
-                          <>
-                            <Button size="sm" onClick={() => setFormTarget(e)}>Editar</Button>
-                            {e.id !== currentUser.id && (
-                              <Button size="sm" variant="danger" onClick={() => handleDelete(e.id)}>
-                                Remover
-                              </Button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+              visible.map((e, i) => (
+                <tr key={e.id} className={i < visible.length - 1 ? 'border-b border-gray-100' : ''}>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar name={e.name} />
+                      <span className="text-sm font-medium text-gray-900">{e.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{e.email}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{e.managerName ?? '—'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => setDetailTarget(e)}>Ver</Button>
+                      <Button size="sm" onClick={() => setFormTarget(e)}>Editar</Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={isPending}
+                        onClick={() => handleDelete(e.id, e.name)}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
@@ -120,12 +120,16 @@ export function CollaboratorsTable() {
       {formTarget !== null && (
         <CollaboratorForm
           employee={formTarget === 'new' ? null : formTarget}
+          potentialManagers={potentialManagers}
           onClose={() => setFormTarget(null)}
         />
       )}
 
       {detailTarget && (
-        <CollaboratorDetail employee={detailTarget} onClose={() => setDetailTarget(null)} />
+        <CollaboratorDetail
+          employee={detailTarget}
+          onClose={() => setDetailTarget(null)}
+        />
       )}
     </div>
   );

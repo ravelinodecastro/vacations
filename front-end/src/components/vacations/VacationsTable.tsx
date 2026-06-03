@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { useApp } from '@/contexts/AppContext';
-import type { VacationRequest, VacationStatus } from '@/types';
-import { Avatar } from '@/components/ui/Avatar';
+import { useState, useTransition } from 'react';
+import type { Employee, Role, VacationRequest, VacationStatus } from '@/types';
+import {
+  approveVacationAction,
+  cancelVacationAction,
+  rejectVacationAction,
+} from '@/actions/vacations';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { VacationForm } from './VacationForm';
 import { VacationDetail } from './VacationDetail';
+import { VacationForm } from './VacationForm';
 import { formatDate, daysBetween } from '@/lib/utils';
 
 type FilterStatus = VacationStatus | 'all';
@@ -19,38 +22,34 @@ const FILTERS: { value: FilterStatus; label: string }[] = [
   { value: 'rejected', label: 'Rejeitados' },
 ];
 
-export function VacationsTable() {
-  const {
-    employees,
-    vacationRequests,
-    currentUser,
-    approveRequest,
-    rejectRequest,
-    cancelRequest,
-  } = useApp();
+interface Props {
+  vacations: VacationRequest[];
+  /** Colaboradores disponíveis — preenchido para admin; vazio para manager/collaborator. */
+  employees: Employee[];
+  sessionRole: Role;
+  fetchError: string | null;
+}
 
-  const [filter, setFilter]           = useState<FilterStatus>('all');
-  const [formTarget, setFormTarget]   = useState<VacationRequest | null | 'new'>(null);
-  const [detailTarget, setDetailTarget] = useState<VacationRequest | null>(null);
+export function VacationsTable({ vacations, employees, sessionRole, fetchError }: Props) {
+  const [filter, setFilter]              = useState<FilterStatus>('all');
+  const [detailTarget, setDetailTarget]  = useState<VacationRequest | null>(null);
+  const [showForm, setShowForm]          = useState(false);
+  const [actionError, setActionError]    = useState<string | null>(null);
+  const [isSubmitting, startTransition]  = useTransition();
 
-  const canCreate  = currentUser.role === 'collaborator' || currentUser.role === 'admin';
-  const canApprove = currentUser.role === 'manager' || currentUser.role === 'admin';
+  const canCreate  = sessionRole === 'collaborator' || sessionRole === 'admin';
+  const canApprove = sessionRole === 'manager'      || sessionRole === 'admin';
 
-  const myTeamIds = employees
-    .filter(e => e.managerId === currentUser.id)
-    .map(e => e.id);
-
-  const visible = vacationRequests
-    .filter(r => {
-      if (currentUser.role === 'collaborator') return r.employeeId === currentUser.id;
-      if (currentUser.role === 'manager')      return myTeamIds.includes(r.employeeId);
-      return true;
-    })
+  const visible = vacations
     .filter(r => filter === 'all' || r.status === filter)
-    .sort((a, b) => b.id - a.id);
+    .sort((a, b) => (a.startDate < b.startDate ? 1 : -1));
 
-  function handleCancel(id: number) {
-    if (window.confirm('Cancelar este pedido de férias?')) cancelRequest(id);
+  function act(fn: () => Promise<{ error?: string }>) {
+    setActionError(null);
+    startTransition(async () => {
+      const result = await fn();
+      if (result.error) setActionError(result.error);
+    });
   }
 
   return (
@@ -62,14 +61,28 @@ export function VacationsTable() {
             {visible.length} pedido{visible.length !== 1 ? 's' : ''}
           </p>
         </div>
+        {/* O botão é mostrado sempre que o utilizador pode criar — independente de ter ID pré-carregado */}
         {canCreate && (
-          <Button variant="primary" onClick={() => setFormTarget('new')}>
+          <Button variant="primary" onClick={() => setShowForm(true)}>
             + Novo Pedido
           </Button>
         )}
       </div>
 
-      {/* Status filters */}
+      {(fetchError || actionError) && (
+        <div className="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {fetchError ?? actionError}
+        </div>
+      )}
+
+      {sessionRole === 'collaborator' && (
+        <div className="mb-5 px-4 py-3 bg-brand-light border border-brand/20 rounded-lg text-sm text-brand-dark">
+          A listagem de pedidos requer permissão de admin ou manager. Para criar um pedido,
+          necessita do seu <strong>ID de colaborador</strong> (UUID disponibilizado pelo administrador).
+        </div>
+      )}
+
+      {/* Filtros de estado */}
       <div className="flex gap-2 mb-5 flex-wrap">
         {FILTERS.map(f => (
           <button
@@ -90,7 +103,7 @@ export function VacationsTable() {
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-50">
-              {['Colaborador', 'Período', 'Dias', 'Motivo', 'Estado', 'Ações'].map(h => (
+              {['Colaborador', 'Período', 'Dias', 'Estado', 'Ações'].map(h => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200"
@@ -103,40 +116,27 @@ export function VacationsTable() {
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
                   Nenhum pedido encontrado.
                 </td>
               </tr>
             ) : (
               visible.map((r, i) => {
-                const employee = employees.find(e => e.id === r.employeeId);
-                const days     = daysBetween(r.startDate, r.endDate);
-                const isPending = r.status === 'pending';
-                const isOwner   = r.employeeId === currentUser.id;
-                const canActOnThis =
-                  canApprove &&
-                  (currentUser.role === 'admin' || myTeamIds.includes(r.employeeId));
+                const days         = daysBetween(r.startDate, r.endDate);
+                const rowIsPending = r.status === 'pending';
 
                 return (
                   <tr
                     key={r.id}
                     className={i < visible.length - 1 ? 'border-b border-gray-100' : ''}
                   >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={employee?.name ?? '?'} size="sm" />
-                        <span className="text-sm font-medium text-gray-900">
-                          {employee?.name ?? 'Desconhecido'}
-                        </span>
-                      </div>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      {r.employeeName}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {formatDate(r.startDate)} → {formatDate(r.endDate)}
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-brand-dark">{days}d</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 max-w-36 truncate">
-                      {r.reason || '—'}
-                    </td>
                     <td className="px-4 py-3">
                       <Badge status={r.status} />
                     </td>
@@ -144,23 +144,36 @@ export function VacationsTable() {
                       <div className="flex gap-1.5 flex-wrap">
                         <Button size="sm" onClick={() => setDetailTarget(r)}>Ver</Button>
 
-                        {isOwner && isPending && (
-                          <Button size="sm" onClick={() => setFormTarget(r)}>Editar</Button>
-                        )}
-                        {isOwner && isPending && (
-                          <Button size="sm" variant="danger" onClick={() => handleCancel(r.id)}>
-                            Cancelar
-                          </Button>
-                        )}
-                        {canActOnThis && isPending && (
+                        {rowIsPending && canApprove && (
                           <>
-                            <Button size="sm" variant="success" onClick={() => approveRequest(r.id)}>
+                            <Button
+                              size="sm"
+                              variant="success"
+                              disabled={isSubmitting}
+                              onClick={() => act(() => approveVacationAction(r.id))}
+                            >
                               Aprovar
                             </Button>
-                            <Button size="sm" variant="danger" onClick={() => rejectRequest(r.id)}>
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              disabled={isSubmitting}
+                              onClick={() => act(() => rejectVacationAction(r.id))}
+                            >
                               Rejeitar
                             </Button>
                           </>
+                        )}
+
+                        {rowIsPending && sessionRole === 'collaborator' && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={isSubmitting}
+                            onClick={() => act(() => cancelVacationAction(r.id))}
+                          >
+                            Cancelar
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -172,10 +185,10 @@ export function VacationsTable() {
         </table>
       </div>
 
-      {formTarget !== null && (
+      {showForm && (
         <VacationForm
-          request={formTarget === 'new' ? null : formTarget}
-          onClose={() => setFormTarget(null)}
+          employees={employees}
+          onClose={() => setShowForm(false)}
         />
       )}
 

@@ -1,13 +1,9 @@
 'use client';
 
-import { useApp } from '@/contexts/AppContext';
 import type { Employee } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
-import { RoleBadge } from '@/components/ui/RoleBadge';
 import { Button } from '@/components/ui/Button';
-import { formatDate, daysBetween } from '@/lib/utils';
 
 interface Props {
   employee: Employee;
@@ -15,8 +11,11 @@ interface Props {
 }
 
 export function CollaboratorDetail({ employee, onClose }: Props) {
-  const { vacationRequests } = useApp();
-  const requests = vacationRequests.filter(r => r.employeeId === employee.id);
+  const rows: [string, string][] = [
+    ['Email',   employee.email],
+    ['Manager', employee.managerName ?? '—'],
+    ['ID',      employee.id],
+  ];
 
   return (
     <Modal title="Detalhe do Colaborador" onClose={onClose}>
@@ -24,35 +23,23 @@ export function CollaboratorDetail({ employee, onClose }: Props) {
         <Avatar name={employee.name} size="lg" />
         <div>
           <p className="font-semibold text-gray-900">{employee.name}</p>
-          <p className="text-sm text-gray-500 mb-1.5">{employee.email}</p>
-          <RoleBadge role={employee.role} />
+          <p className="text-sm text-gray-500">{employee.email}</p>
         </div>
       </div>
 
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-        Pedidos de Férias
-      </p>
-
-      {requests.length === 0 ? (
-        <p className="text-sm text-gray-400 py-2">Nenhum pedido registado.</p>
-      ) : (
-        <div className="space-y-2">
-          {requests.map(r => (
-            <div key={r.id} className="border border-gray-200 rounded-lg px-3.5 py-2.5">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-800">
-                  {formatDate(r.startDate)} → {formatDate(r.endDate)}
-                </span>
-                <Badge status={r.status} />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {daysBetween(r.startDate, r.endDate)} dias
-                {r.reason ? ` · ${r.reason}` : ''}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+      <div>
+        {rows.map(([label, value]) => (
+          <div
+            key={label}
+            className="flex justify-between py-2 border-b border-gray-50 last:border-0"
+          >
+            <span className="text-sm text-gray-500">{label}</span>
+            <span className="text-sm font-medium text-gray-900 text-right max-w-64 break-all">
+              {value}
+            </span>
+          </div>
+        ))}
+      </div>
 
       <div className="flex justify-end mt-5">
         <Button onClick={onClose}>Fechar</Button>

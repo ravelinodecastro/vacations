@@ -1,33 +1,30 @@
 'use client';
 
-import { useState } from 'react';
-import { useApp } from '@/contexts/AppContext';
-import { ROLE_LABELS } from '@/lib/constants';
-import type { Employee, Role } from '@/types';
+import { useState, useTransition } from 'react';
+import type { Employee } from '@/types';
+import { createEmployeeAction, updateEmployeeAction } from '@/actions/employees';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
 
 interface Props {
   employee: Employee | null;
+  potentialManagers: Employee[];
   onClose: () => void;
 }
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-brand';
 
-export function CollaboratorForm({ employee, onClose }: Props) {
-  const { employees, createEmployee, updateEmployee } = useApp();
-
+export function CollaboratorForm({ employee, potentialManagers, onClose }: Props) {
   const [form, setForm] = useState({
-    name:      employee?.name ?? '',
-    email:     employee?.email ?? '',
-    role:      (employee?.role ?? 'collaborator') as Role,
-    managerId: employee?.managerId?.toString() ?? '',
+    name:      employee?.name      ?? '',
+    email:     employee?.email     ?? '',
+    managerId: employee?.managerId ?? '',
+    sub:       '',
   });
   const [error, setError] = useState('');
-
-  const managers = employees.filter(e => e.role === 'manager' || e.role === 'admin');
+  const [isPending, startTransition] = useTransition();
 
   function handleSubmit() {
     setError('');
@@ -35,24 +32,25 @@ export function CollaboratorForm({ employee, onClose }: Props) {
       setError('Nome e email são obrigatórios.');
       return;
     }
-    if (form.role !== 'admin' && !form.managerId) {
-      setError('Selecione um manager responsável.');
-      return;
-    }
 
-    const data = {
+    const body = {
       name:      form.name.trim(),
       email:     form.email.trim(),
-      role:      form.role,
-      managerId: form.managerId ? Number(form.managerId) : null,
+      managerId: form.managerId || undefined,
+      sub:       form.sub.trim() || undefined,
     };
 
-    const result = employee ? updateEmployee(employee.id, data) : createEmployee(data);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    onClose();
+    startTransition(async () => {
+      const result = employee
+        ? await updateEmployeeAction(employee.id, body)
+        : await createEmployeeAction(body);
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        onClose();
+      }
+    });
   }
 
   return (
@@ -80,41 +78,37 @@ export function CollaboratorForm({ employee, onClose }: Props) {
         />
       </Field>
 
-      <Field label="Função">
+      <Field label="Manager responsável">
         <select
           className={inputClass}
-          value={form.role}
-          onChange={e =>
-            setForm(f => ({ ...f, role: e.target.value as Role, managerId: '' }))
-          }
+          value={form.managerId}
+          onChange={e => setForm(f => ({ ...f, managerId: e.target.value }))}
         >
-          <option value="collaborator">{ROLE_LABELS.collaborator}</option>
-          <option value="manager">{ROLE_LABELS.manager}</option>
-          <option value="admin">{ROLE_LABELS.admin}</option>
+          <option value="">Sem manager</option>
+          {potentialManagers
+            .filter(m => m.id !== employee?.id)
+            .map(m => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
         </select>
       </Field>
 
-      {form.role !== 'admin' && (
-        <Field label="Manager responsável">
-          <select
-            className={inputClass}
-            value={form.managerId}
-            onChange={e => setForm(f => ({ ...f, managerId: e.target.value }))}
-          >
-            <option value="">Selecionar manager...</option>
-            {managers.map(m => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
+      <Field label="Keycloak Subject (sub)">
+        <input
+          className={inputClass}
+          placeholder="UUID do utilizador no Keycloak (opcional)"
+          value={form.sub}
+          onChange={e => setForm(f => ({ ...f, sub: e.target.value }))}
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          Liga este colaborador a uma conta Keycloak para login.
+        </p>
+      </Field>
 
       <div className="flex justify-end gap-2.5 mt-2">
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button variant="primary" onClick={handleSubmit}>
-          {employee ? 'Guardar' : 'Criar'}
+        <Button onClick={onClose} disabled={isPending}>Cancelar</Button>
+        <Button variant="primary" onClick={handleSubmit} disabled={isPending}>
+          {isPending ? 'A guardar...' : employee ? 'Guardar' : 'Criar'}
         </Button>
       </div>
     </Modal>

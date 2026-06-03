@@ -1,18 +1,18 @@
-import type { Employee, VacationRequest } from '@/types';
+import type { Employee, Role, VacationRequest } from '@/types';
 import { StatCard } from '@/components/ui/StatCard';
 
 interface Props {
-  requests: VacationRequest[];
+  vacations: VacationRequest[];
   employees: Employee[];
-  currentUser: Employee;
+  sessionRole: Role;
 }
 
-export function StatsGrid({ requests, employees, currentUser }: Props) {
+export function StatsGrid({ vacations, employees, sessionRole }: Props) {
   const mainStats = [
-    { label: 'Total de Pedidos', value: requests.length,                                   colorClass: 'text-brand-dark'  },
-    { label: 'Pendentes',        value: requests.filter(r => r.status === 'pending').length,  colorClass: 'text-amber-600'   },
-    { label: 'Aprovados',        value: requests.filter(r => r.status === 'approved').length, colorClass: 'text-emerald-600' },
-    { label: 'Rejeitados',       value: requests.filter(r => r.status === 'rejected').length, colorClass: 'text-red-600'     },
+    { label: 'Total de Pedidos', value: vacations.length,                                    colorClass: 'text-brand-dark'  },
+    { label: 'Pendentes',        value: vacations.filter(r => r.status === 'pending').length,  colorClass: 'text-amber-600'   },
+    { label: 'Aprovados',        value: vacations.filter(r => r.status === 'approved').length, colorClass: 'text-emerald-600' },
+    { label: 'Rejeitados',       value: vacations.filter(r => r.status === 'rejected').length, colorClass: 'text-red-600'     },
   ];
 
   return (
@@ -23,10 +23,9 @@ export function StatsGrid({ requests, employees, currentUser }: Props) {
         ))}
       </div>
 
-      {currentUser.role === 'admin' && (
+      {sessionRole === 'admin' && (
         <div className="grid grid-cols-2 gap-3.5">
-          <StatCard label="Colaboradores" value={employees.filter(e => e.role === 'collaborator').length} />
-          <StatCard label="Managers"      value={employees.filter(e => e.role === 'manager').length} />
+          <StatCard label="Colaboradores" value={employees.length} />
         </div>
       )}
     </div>

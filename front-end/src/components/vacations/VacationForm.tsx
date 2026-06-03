@@ -1,35 +1,45 @@
 'use client';
 
-import { useState } from 'react';
-import { useApp } from '@/contexts/AppContext';
-import type { VacationRequest } from '@/types';
+import { useState, useTransition } from 'react';
+import type { Employee } from '@/types';
+import { createVacationAction } from '@/actions/vacations';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
 import { daysBetween } from '@/lib/utils';
 
 interface Props {
-  request: VacationRequest | null;
+  /** Lista de colaboradores para o admin selecionar. Vazia para outros roles. */
+  employees: Employee[];
+  /** Pré-preenche o campo do colaborador (ex.: próprio ID do admin). */
+  initialEmployeeId?: string;
   onClose: () => void;
 }
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-brand';
 
-export function VacationForm({ request, onClose }: Props) {
-  const { currentUser, createVacationRequest, updateVacationRequest } = useApp();
-
+export function VacationForm({ employees, initialEmployeeId = '', onClose }: Props) {
   const [form, setForm] = useState({
-    startDate: request?.startDate ?? '',
-    endDate:   request?.endDate ?? '',
-    reason:    request?.reason ?? '',
+    employeeId: initialEmployeeId,
+    startDate:  '',
+    endDate:    '',
   });
-  const [error, setError] = useState('');
+  const [error, setError]         = useState('');
+  const [isPending, startTransition] = useTransition();
 
-  const showDays = form.startDate && form.endDate && form.startDate <= form.endDate;
+  const showDays =
+    form.startDate && form.endDate && form.startDate <= form.endDate;
+
+  // Admin vê dropdown; colaborador vê campo de texto
+  const hasEmployeeList = employees.length > 0;
 
   function handleSubmit() {
     setError('');
+    if (!form.employeeId.trim()) {
+      setError('Introduza o ID do colaborador.');
+      return;
+    }
     if (!form.startDate || !form.endDate) {
       setError('Preencha as datas de início e fim.');
       return;
@@ -39,24 +49,54 @@ export function VacationForm({ request, onClose }: Props) {
       return;
     }
 
-    const result = request
-      ? updateVacationRequest(request.id, form)
-      : createVacationRequest({ employeeId: currentUser.id, ...form });
-
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    onClose();
+    startTransition(async () => {
+      const result = await createVacationAction(form.employeeId.trim(), {
+        startDate: form.startDate,
+        endDate:   form.endDate,
+      });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        onClose();
+      }
+    });
   }
 
   return (
-    <Modal title={request ? 'Editar Pedido' : 'Novo Pedido de Férias'} onClose={onClose}>
+    <Modal title="Novo Pedido de Férias" onClose={onClose}>
       {error && (
         <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
           {error}
         </div>
       )}
+
+      {/* Seleção do colaborador */}
+      <Field label="Colaborador">
+        {hasEmployeeList ? (
+          <select
+            className={inputClass}
+            value={form.employeeId}
+            onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}
+          >
+            <option value="">Selecionar colaborador...</option>
+            {employees.map(e => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input
+              className={inputClass}
+              placeholder="UUID do colaborador (ex: fc3a7c94-...)"
+              value={form.employeeId}
+              onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}
+            />
+            <p className="mt-1.5 text-xs text-gray-400">
+              O seu ID é disponibilizado pelo administrador ao criar o seu registo.
+            </p>
+          </>
+        )}
+      </Field>
 
       <Field label="Data de início">
         <input
@@ -82,19 +122,10 @@ export function VacationForm({ request, onClose }: Props) {
         </p>
       )}
 
-      <Field label="Motivo (opcional)">
-        <textarea
-          className={`${inputClass} h-20 resize-none`}
-          value={form.reason}
-          onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
-          placeholder="Ex: férias de verão..."
-        />
-      </Field>
-
       <div className="flex justify-end gap-2.5 mt-2">
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button variant="primary" onClick={handleSubmit}>
-          {request ? 'Guardar' : 'Submeter'}
+        <Button onClick={onClose} disabled={isPending}>Cancelar</Button>
+        <Button variant="primary" onClick={handleSubmit} disabled={isPending}>
+          {isPending ? 'A submeter...' : 'Submeter'}
         </Button>
       </div>
     </Modal>

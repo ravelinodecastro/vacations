@@ -1,8 +1,7 @@
 'use client';
 
-import { useApp } from '@/contexts/AppContext';
-import { RoleBadge } from '@/components/ui/RoleBadge';
 import { Avatar } from '@/components/ui/Avatar';
+import { RoleBadge } from '@/components/ui/RoleBadge';
 import { NavItem } from './NavItem';
 import type { Role } from '@/types';
 
@@ -14,25 +13,15 @@ interface SessionUser {
 
 interface Props {
   sessionUser: SessionUser;
+  pendingCount: number;
   onSignOut: () => Promise<void>;
 }
 
-export function Sidebar({ sessionUser, onSignOut }: Props) {
-  const { employees, vacationRequests, currentUser } = useApp();
-
-  const pendingCount = vacationRequests.filter(r => {
-    if (r.status !== 'pending') return false;
-    if (sessionUser.role === 'admin') return true;
-    if (sessionUser.role === 'manager') {
-      return employees.find(e => e.id === r.employeeId)?.managerId === currentUser.id;
-    }
-    return false;
-  }).length;
-
+export function Sidebar({ sessionUser, pendingCount, onSignOut }: Props) {
   const navItems = [
-    { href: '/dashboard',      label: 'Dashboard',      icon: '⊞' },
-    { href: '/vacations',      label: 'Férias',         icon: '🗓' },
-    ...(sessionUser.role !== 'collaborator'
+    { href: '/dashboard',  label: 'Dashboard', icon: '⊞' },
+    { href: '/vacations',  label: 'Férias',    icon: '🗓' },
+    ...(sessionUser.role === 'admin'
       ? [{ href: '/collaborators', label: 'Colaboradores', icon: '👥' }]
       : []),
   ];
@@ -75,7 +64,6 @@ export function Sidebar({ sessionUser, onSignOut }: Props) {
           </div>
         </div>
 
-        {/* Sign out */}
         <form action={onSignOut} className="px-4 pb-4">
           <button
             type="submit"
