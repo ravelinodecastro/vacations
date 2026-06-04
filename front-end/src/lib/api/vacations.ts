@@ -22,6 +22,23 @@ export async function getVacations(): Promise<VacationRequest[]> {
   return data.map(toVacation);
 }
 
+/** Devolve os pedidos do próprio colaborador autenticado (usa o sub do JWT). */
+export async function getMyVacations(): Promise<VacationRequest[]> {
+  const data = await httpClient.get<ApiVacationRequest[]>('/api/vacations/my');
+  return data.map(toVacation);
+}
+
+/**
+ * Cria um pedido de férias para o colaborador autenticado.
+ * O backend identifica automaticamente o employee pelo sub do JWT.
+ */
+export async function createMyVacation(
+  body: CreateVacationBody,
+): Promise<VacationRequest> {
+  const data = await httpClient.post<ApiVacationRequest>('/api/vacations/my', body);
+  return toVacation(data);
+}
+
 export async function createVacation(
   employeeId: string,
   body: CreateVacationBody,

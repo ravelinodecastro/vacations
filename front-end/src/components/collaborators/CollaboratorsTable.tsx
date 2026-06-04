@@ -11,13 +11,14 @@ import { CollaboratorDetail } from './CollaboratorDetail';
 interface Props {
   employees: Employee[];
   fetchError: string | null;
+  keycloakUsersUrl: string;
 }
 
-export function CollaboratorsTable({ employees, fetchError }: Props) {
-  const [search, setSearch] = useState('');
-  const [formTarget, setFormTarget] = useState<Employee | null | 'new'>(null);
+export function CollaboratorsTable({ employees, fetchError, keycloakUsersUrl }: Props) {
+  const [search, setSearch]          = useState('');
+  const [formTarget, setFormTarget]  = useState<Employee | null | 'new'>(null);
   const [detailTarget, setDetailTarget] = useState<Employee | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError]   = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const visible = employees.filter(e => {
@@ -25,7 +26,6 @@ export function CollaboratorsTable({ employees, fetchError }: Props) {
     return e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
   });
 
-  // All employees are potential managers (backend doesn't restrict by role)
   const potentialManagers = employees;
 
   function handleDelete(id: string, name: string) {
@@ -46,9 +46,29 @@ export function CollaboratorsTable({ employees, fetchError }: Props) {
             {visible.length} utilizador{visible.length !== 1 ? 'es' : ''}
           </p>
         </div>
-        <Button variant="primary" onClick={() => setFormTarget('new')}>
-          + Novo Colaborador
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Link para a consola Keycloak — criar utilizadores com role */}
+          <a
+            href={keycloakUsersUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors"
+            title="Gerir utilizadores e roles no Keycloak"
+          >
+            <span>🔑</span>
+            Gerir no Keycloak
+          </a>
+          <Button variant="primary" onClick={() => setFormTarget('new')}>
+            + Novo Colaborador
+          </Button>
+        </div>
+      </div>
+
+      {/* Aviso: novos utilizadores Keycloak ficam registados automaticamente no primeiro login */}
+      <div className="mb-5 px-4 py-3 bg-brand-light border border-brand/20 rounded-lg text-sm text-brand-dark">
+        Os utilizadores autenticados via Keycloak são registados automaticamente no primeiro login.
+        Use <strong>Gerir no Keycloak</strong> para criar utilizadores e atribuir roles
+        (Admin / Manager / Collaborator).
       </div>
 
       {(fetchError || actionError) && (
@@ -126,10 +146,7 @@ export function CollaboratorsTable({ employees, fetchError }: Props) {
       )}
 
       {detailTarget && (
-        <CollaboratorDetail
-          employee={detailTarget}
-          onClose={() => setDetailTarget(null)}
-        />
+        <CollaboratorDetail employee={detailTarget} onClose={() => setDetailTarget(null)} />
       )}
     </div>
   );

@@ -1,45 +1,28 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import type { Employee } from '@/types';
-import { createVacationAction } from '@/actions/vacations';
+import { createMyVacationAction } from '@/actions/vacations';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { Button } from '@/components/ui/Button';
 import { daysBetween } from '@/lib/utils';
 
 interface Props {
-  /** Lista de colaboradores para o admin selecionar. Vazia para outros roles. */
-  employees: Employee[];
-  /** Pré-preenche o campo do colaborador (ex.: próprio ID do admin). */
-  initialEmployeeId?: string;
   onClose: () => void;
 }
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-brand';
 
-export function VacationForm({ employees, initialEmployeeId = '', onClose }: Props) {
-  const [form, setForm] = useState({
-    employeeId: initialEmployeeId,
-    startDate:  '',
-    endDate:    '',
-  });
-  const [error, setError]         = useState('');
+export function VacationForm({ onClose }: Props) {
+  const [form, setForm]              = useState({ startDate: '', endDate: '' });
+  const [error, setError]            = useState('');
   const [isPending, startTransition] = useTransition();
 
-  const showDays =
-    form.startDate && form.endDate && form.startDate <= form.endDate;
-
-  // Admin vê dropdown; colaborador vê campo de texto
-  const hasEmployeeList = employees.length > 0;
+  const showDays = form.startDate && form.endDate && form.startDate <= form.endDate;
 
   function handleSubmit() {
     setError('');
-    if (!form.employeeId.trim()) {
-      setError('Introduza o ID do colaborador.');
-      return;
-    }
     if (!form.startDate || !form.endDate) {
       setError('Preencha as datas de início e fim.');
       return;
@@ -50,10 +33,7 @@ export function VacationForm({ employees, initialEmployeeId = '', onClose }: Pro
     }
 
     startTransition(async () => {
-      const result = await createVacationAction(form.employeeId.trim(), {
-        startDate: form.startDate,
-        endDate:   form.endDate,
-      });
+      const result = await createMyVacationAction(form);
       if (result.error) {
         setError(result.error);
       } else {
@@ -69,34 +49,6 @@ export function VacationForm({ employees, initialEmployeeId = '', onClose }: Pro
           {error}
         </div>
       )}
-
-      {/* Seleção do colaborador */}
-      <Field label="Colaborador">
-        {hasEmployeeList ? (
-          <select
-            className={inputClass}
-            value={form.employeeId}
-            onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}
-          >
-            <option value="">Selecionar colaborador...</option>
-            {employees.map(e => (
-              <option key={e.id} value={e.id}>{e.name}</option>
-            ))}
-          </select>
-        ) : (
-          <>
-            <input
-              className={inputClass}
-              placeholder="UUID do colaborador (ex: fc3a7c94-...)"
-              value={form.employeeId}
-              onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))}
-            />
-            <p className="mt-1.5 text-xs text-gray-400">
-              O seu ID é disponibilizado pelo administrador ao criar o seu registo.
-            </p>
-          </>
-        )}
-      </Field>
 
       <Field label="Data de início">
         <input

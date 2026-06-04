@@ -37,3 +37,13 @@ export async function updateEmployee(id: string, body: CreateEmployeeBody): Prom
 export async function deleteEmployee(id: string): Promise<void> {
   await httpClient.delete(`/api/employees/${id}`);
 }
+
+/**
+ * Encontra ou cria o registo de employee do utilizador autenticado.
+ * O backend usa o sub do JWT para identificar o utilizador.
+ * Deve ser chamado no login para garantir que todos os utilizadores têm registo.
+ */
+export async function ensureMyEmployee(): Promise<Employee> {
+  const data = await httpClient.post<ApiEmployee>('/api/employees/me');
+  return toEmployee(data);
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import type { Employee, Role, VacationRequest, VacationStatus } from '@/types';
+import type { Role, VacationRequest, VacationStatus } from '@/types';
 import {
   approveVacationAction,
   cancelVacationAction,
@@ -24,21 +24,20 @@ const FILTERS: { value: FilterStatus; label: string }[] = [
 
 interface Props {
   vacations: VacationRequest[];
-  /** Colaboradores disponíveis — preenchido para admin; vazio para manager/collaborator. */
-  employees: Employee[];
   sessionRole: Role;
   fetchError: string | null;
 }
 
-export function VacationsTable({ vacations, employees, sessionRole, fetchError }: Props) {
+export function VacationsTable({ vacations, sessionRole, fetchError }: Props) {
   const [filter, setFilter]              = useState<FilterStatus>('all');
   const [detailTarget, setDetailTarget]  = useState<VacationRequest | null>(null);
   const [showForm, setShowForm]          = useState(false);
   const [actionError, setActionError]    = useState<string | null>(null);
   const [isSubmitting, startTransition]  = useTransition();
 
-  const canCreate  = sessionRole === 'collaborator' || sessionRole === 'admin';
-  const canApprove = sessionRole === 'manager'      || sessionRole === 'admin';
+  // Apenas colaboradores podem criar pedidos (backend: POST /api/vacations/my)
+  const canCreate  = sessionRole === 'collaborator';
+  const canApprove = sessionRole === 'manager' || sessionRole === 'admin';
 
   const visible = vacations
     .filter(r => filter === 'all' || r.status === filter)
@@ -72,13 +71,6 @@ export function VacationsTable({ vacations, employees, sessionRole, fetchError }
       {(fetchError || actionError) && (
         <div className="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
           {fetchError ?? actionError}
-        </div>
-      )}
-
-      {sessionRole === 'collaborator' && (
-        <div className="mb-5 px-4 py-3 bg-brand-light border border-brand/20 rounded-lg text-sm text-brand-dark">
-          A listagem de pedidos requer permissão de admin ou manager. Para criar um pedido,
-          necessita do seu <strong>ID de colaborador</strong> (UUID disponibilizado pelo administrador).
         </div>
       )}
 
@@ -186,10 +178,7 @@ export function VacationsTable({ vacations, employees, sessionRole, fetchError }
       </div>
 
       {showForm && (
-        <VacationForm
-          employees={employees}
-          onClose={() => setShowForm(false)}
-        />
+        <VacationForm onClose={() => setShowForm(false)} />
       )}
 
       {detailTarget && (

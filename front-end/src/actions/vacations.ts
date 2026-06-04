@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import {
-  createVacation,
+  createMyVacation,
   approveVacation,
   rejectVacation,
   cancelVacation,
@@ -15,12 +15,12 @@ export interface ActionResult<T = void> {
   error?: string;
 }
 
-export async function createVacationAction(
-  employeeId: string,
+/** Colaborador cria o seu próprio pedido — o backend identifica-o pelo sub do JWT. */
+export async function createMyVacationAction(
   body: { startDate: string; endDate: string },
 ): Promise<ActionResult<VacationRequest>> {
   try {
-    const data = await createVacation(employeeId, body);
+    const data = await createMyVacation(body);
     revalidatePath('/vacations');
     revalidatePath('/dashboard');
     return { data };

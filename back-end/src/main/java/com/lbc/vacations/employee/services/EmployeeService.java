@@ -30,36 +30,52 @@ public class EmployeeService {
         Employee employee = employeeMapper.toEntity(request);
 
         if (request.managerId() != null) {
-
             Employee manager = findEmployeeEntity(request.managerId());
-
             employee.setManager(manager);
         }
 
-        Employee savedEmployee = employeeRepository.save(employee);
+        return employeeMapper.toResponse(employeeRepository.save(employee));
+    }
 
-        return employeeMapper.toResponse(savedEmployee);
+    /**
+     * Encontra o registo do utilizador pelo Keycloak subject (sub).
+     * Se não existir, cria automaticamente usando os dados do JWT.
+     * Chamado no login para garantir que todos os utilizadores têm registo.
+     */
+    public EmployeeResponse findOrCreate(String sub, String name, String email) {
+
+        // 1. Já existe registo com este sub
+        return employeeRepository.findBySub(sub)
+                .map(employeeMapper::toResponse)
+                .orElseGet(() -> {
+                    // 2. Existe registo com o mesmo email mas sem sub → ligar ao utilizador
+                    if (employeeRepository.existsByEmail(email)) {
+                        Employee existing = employeeRepository.findByEmail(email)
+                                .orElseThrow(() -> new NotFoundException("Employee not found"));
+                        existing.setSub(sub);
+                        return employeeMapper.toResponse(employeeRepository.save(existing));
+                    }
+                    // 3. Não existe — criar novo registo
+                    Employee employee = Employee.builder()
+                            .sub(sub)
+                            .name(name)
+                            .email(email)
+                            .build();
+                    return employeeMapper.toResponse(employeeRepository.save(employee));
+                });
     }
 
     @Transactional(readOnly = true)
     public EmployeeResponse findById(UUID id) {
-
-        Employee employee = findEmployeeEntity(id);
-
-        return employeeMapper.toResponse(employee);
+        return employeeMapper.toResponse(findEmployeeEntity(id));
     }
 
     @Transactional(readOnly = true)
     public Page<EmployeeResponse> findAll(Pageable pageable) {
-
-        return employeeRepository.findAll(pageable)
-                .map(employeeMapper::toResponse);
+        return employeeRepository.findAll(pageable).map(employeeMapper::toResponse);
     }
 
-    public EmployeeResponse update(
-            UUID id,
-            EmployeeRequest request
-    ) {
+    public EmployeeResponse update(UUID id, EmployeeRequest request) {
 
         Employee employee = findEmployeeEntity(id);
 
@@ -70,68 +86,39 @@ public class EmployeeService {
         employee.setSub(request.sub());
 
         if (request.managerId() != null) {
-
             Employee manager = findEmployeeEntity(request.managerId());
-
             if (manager.getId().equals(employee.getId())) {
-                throw new BusinessException(
-                        "Employee cannot be their own manager"
-                );
+                throw new BusinessException("Employee cannot be their own manager");
             }
-
             employee.setManager(manager);
-
         } else {
             employee.setManager(null);
         }
 
-        Employee updatedEmployee =
-                employeeRepository.save(employee);
-
-        return employeeMapper.toResponse(updatedEmployee);
+        return employeeMapper.toResponse(employeeRepository.save(employee));
     }
 
     public void delete(UUID id) {
-
-        Employee employee = findEmployeeEntity(id);
-
-        employeeRepository.delete(employee);
+        employeeRepository.delete(findEmployeeEntity(id));
     }
 
-    private Employee findEmployeeEntity(UUID id) {
+    // ─── Internos ─────────────────────────────────────────────────────────────
 
+    private Employee findEmployeeEntity(UUID id) {
         return employeeRepository.findById(id)
-                .orElseThrow(() ->
-                        new NotFoundException(
-                                "Employee not found: " + id
-                        )
-                );
+                .orElseThrow(() -> new NotFoundException("Employee not found: " + id));
     }
 
     private void validateEmailNotExists(String email) {
-
         if (employeeRepository.existsByEmail(email)) {
-
-            throw new BusinessException(
-                    "Email already exists"
-            );
+            throw new BusinessException("Email already exists");
         }
     }
 
-    private void validateEmailUpdate(
-            Employee employee,
-            String newEmail
-    ) {
-
-        if (employee.getEmail().equalsIgnoreCase(newEmail)) {
-            return;
-        }
-
-        if (employeeRepository.existsByEmail(newEmail)) {
-
-            throw new BusinessException(
-                    "Email already exists"
-            );
+    private void validateEmailUpdate(Employee employee, String newEmail) {
+        if (!employee.getEmail().equalsIgnoreCase(newEmail)
+                && employeeRepository.existsByEmail(newEmail)) {
+            throw new BusinessException("Email already exists");
         }
     }
 }

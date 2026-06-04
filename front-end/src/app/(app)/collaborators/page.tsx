@@ -7,7 +7,6 @@ export default async function CollaboratorsPage() {
   const session = await auth();
   const sessionRole = session!.user.role as Role;
 
-  // Only admins can manage employees (backend enforces this via @PreAuthorize)
   if (sessionRole !== 'admin') {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -25,10 +24,16 @@ export default async function CollaboratorsPage() {
     fetchError = 'Não foi possível carregar os colaboradores. Verifique se o backend está disponível.';
   }
 
+  // Deriva o URL da consola Keycloak a partir do issuer configurado
+  const issuer = process.env.AUTH_KEYCLOAK_ISSUER ?? 'http://localhost:8080/realms/lbc';
+  const [keycloakBase, realm] = issuer.split('/realms/');
+  const keycloakUsersUrl = `${keycloakBase}/admin/master/console/#/${realm ?? 'lbc'}/users`;
+
   return (
     <CollaboratorsTable
       employees={employees}
       fetchError={fetchError}
+      keycloakUsersUrl={keycloakUsersUrl}
     />
   );
 }

@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -30,6 +31,60 @@ public class VacationService {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new NotFoundException("Employee not found"));
 
+        return buildAndSave(employee, request);
+    }
+
+    /**
+     * Cria um pedido de férias para o colaborador identificado pelo JWT sub.
+     * O colaborador não precisa de saber o seu UUID — é resolvido automaticamente.
+     */
+    public VacationResponse createMyVacation(String sub, CreateVacationRequest request) {
+
+        Employee employee = employeeRepository.findBySub(sub)
+                .orElseThrow(() -> new NotFoundException(
+                        "Registo de colaborador não encontrado. Contacte o administrador."));
+
+        return buildAndSave(employee, request);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VacationResponse> findAll() {
+        return vacationRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Devolve os pedidos do colaborador identificado pelo JWT sub.
+     * Retorna lista vazia se o colaborador ainda não tiver registo.
+     */
+    @Transactional(readOnly = true)
+    public List<VacationResponse> findMyVacations(String sub) {
+        return employeeRepository.findBySub(sub)
+                .map(employee -> vacationRepository.findByEmployeeId(employee.getId())
+                        .stream()
+                        .map(this::toResponse)
+                        .collect(Collectors.toList()))
+                .orElse(List.of());
+    }
+
+    public VacationResponse approve(UUID vacationId) {
+        return updateStatus(vacationId, VacationStatus.APPROVED);
+    }
+
+    public VacationResponse reject(UUID vacationId) {
+        return updateStatus(vacationId, VacationStatus.REJECTED);
+    }
+
+    public VacationResponse cancel(UUID vacationId) {
+        return updateStatus(vacationId, VacationStatus.CANCELLED);
+    }
+
+    // ─── Internos ─────────────────────────────────────────────────────────────
+
+    private VacationResponse buildAndSave(Employee employee, CreateVacationRequest request) {
+
         if (request.endDate().isBefore(request.startDate())) {
             throw new BusinessException("End date cannot be before start date");
         }
@@ -43,29 +98,7 @@ public class VacationService {
                 .status(VacationStatus.PENDING)
                 .build();
 
-        VacationRequest saved = vacationRepository.save(vacation);
-
-        return toResponse(saved);
-    }
-
-    @Transactional(readOnly = true)
-    public List<VacationResponse> findAll() {
-        return vacationRepository.findAll()
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    public VacationResponse approve(UUID vacationId) {
-        return updateStatus(vacationId, VacationStatus.APPROVED);
-    }
-
-    public VacationResponse reject(UUID vacationId) {
-        return updateStatus(vacationId, VacationStatus.REJECTED);
-    }
-
-    public VacationResponse cancel(UUID vacationId) {
-        return updateStatus(vacationId, VacationStatus.CANCELLED);
+        return toResponse(vacationRepository.save(vacation));
     }
 
     private VacationResponse updateStatus(UUID vacationId, VacationStatus status) {
@@ -81,14 +114,11 @@ public class VacationService {
         return toResponse(vacationRepository.save(vacation));
     }
 
-    private void validateNoOverlap(java.time.LocalDate start, java.time.LocalDate end) {
+    private void validateNoOverlap(LocalDate start, LocalDate end) {
 
         List<VacationRequest> overlapping = vacationRepository
                 .findByStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
-                        VacationStatus.APPROVED,
-                        end,
-                        start
-                );
+                        VacationStatus.APPROVED, end, start);
 
         if (!overlapping.isEmpty()) {
             throw new BusinessException("Overlapping vacation exists");
@@ -96,7 +126,6 @@ public class VacationService {
     }
 
     private VacationResponse toResponse(VacationRequest vacation) {
-
         return new VacationResponse(
                 vacation.getId(),
                 vacation.getEmployee().getId(),

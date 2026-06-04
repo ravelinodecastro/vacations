@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth, signOut } from '@/app/auth/auth';
 import { getVacations } from '@/lib/api/vacations';
+import { ensureMyEmployee } from '@/lib/api/employees';
 import { Sidebar } from '@/components/layout/Sidebar';
 import type { Role } from '@/types';
 
@@ -18,14 +19,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     role:  sessionRole,
   };
 
-  // Pending count shown in the sidebar badge (only relevant for admin/manager)
+  // Auto-registo: garante que o utilizador tem registo de employee no backend.
+  // Usa o sub do JWT para encontrar ou criar o registo.
+  try {
+    await ensureMyEmployee();
+  } catch {
+    // Continuar mesmo se o backend estiver indisponível
+  }
+
+  // Contagem de pedidos pendentes para o badge na sidebar (só admin/manager)
   let pendingCount = 0;
   if (sessionRole === 'admin' || sessionRole === 'manager') {
     try {
       const vacations = await getVacations();
       pendingCount = vacations.filter(v => v.status === 'pending').length;
     } catch {
-      // Badge stays 0 if the backend is unavailable
+      // Badge fica em 0 se o backend estiver indisponível
     }
   }
 

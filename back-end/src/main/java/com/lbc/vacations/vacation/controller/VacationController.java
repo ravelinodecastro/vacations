@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,9 +23,32 @@ public class VacationController {
 
     private final VacationService vacationService;
 
+    /**
+     * Criar pedido identificando o colaborador pelo sub do JWT.
+     * Não é necessário saber o UUID do registo de employee.
+     */
+    @PostMapping("/my")
+    @PreAuthorize("hasRole('COLLABORATOR')")
+    @Operation(summary = "Create vacation request — employee auto-identified from JWT")
+    public VacationResponse createMyVacation(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateVacationRequest request
+    ) {
+        return vacationService.createMyVacation(jwt.getSubject(), request);
+    }
+
+    /** Listar os próprios pedidos (colaborador). */
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('COLLABORATOR')")
+    @Operation(summary = "List current collaborator's vacation requests")
+    public List<VacationResponse> findMyVacations(@AuthenticationPrincipal Jwt jwt) {
+        return vacationService.findMyVacations(jwt.getSubject());
+    }
+
+    /** Criar pedido especificando o employee por ID (manter compatibilidade). */
     @PostMapping("/employee/{employeeId}")
     @PreAuthorize("hasRole('COLLABORATOR')")
-    @Operation(summary = "Create vacation request")
+    @Operation(summary = "Create vacation request by employee ID")
     public VacationResponse create(
             @PathVariable UUID employeeId,
             @Valid @RequestBody CreateVacationRequest request
@@ -41,27 +66,21 @@ public class VacationController {
     @PatchMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     @Operation(summary = "Approve vacation request")
-    public VacationResponse approve(
-            @PathVariable UUID id
-    ) {
+    public VacationResponse approve(@PathVariable UUID id) {
         return vacationService.approve(id);
     }
 
     @PatchMapping("/{id}/reject")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     @Operation(summary = "Reject vacation request")
-    public VacationResponse reject(
-            @PathVariable UUID id
-    ) {
+    public VacationResponse reject(@PathVariable UUID id) {
         return vacationService.reject(id);
     }
 
     @PatchMapping("/{id}/cancel")
     @PreAuthorize("hasRole('COLLABORATOR')")
     @Operation(summary = "Cancel vacation request")
-    public VacationResponse cancel(
-            @PathVariable UUID id
-    ) {
+    public VacationResponse cancel(@PathVariable UUID id) {
         return vacationService.cancel(id);
     }
 }

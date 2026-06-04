@@ -138,7 +138,7 @@ AUTH_KEYCLOAK_ISSUER=http://localhost:8080/realms/lbc
 AUTH_SECRET=<gerar-com-openssl>
 
 # URL do backend Spring Boot
-BACKEND_URL=http://localhost:8081
+BACKEND_URL=http://localhost:8080
 ```
 
 > **Nota:** O client Keycloak `vacations` é público — o `AUTH_KEYCLOAK_SECRET` não é validado pelo Keycloak, mas o NextAuth requer um valor não vazio.
@@ -153,7 +153,7 @@ Os utilizadores são importados automaticamente pelo Keycloak no arranque via `k
 |----------|----------|------|-----------|
 | `admin` | `qwerty` | Admin | CRUD completo de colaboradores; gestão de todos os pedidos |
 | `manager` | `qwerty` | Manager | Aprovar/rejeitar pedidos dos seus colaboradores |
-| `collaborator` | `qwerty` | Collaborator | Criar e cancelar os seus próprios pedidos de férias |
+| `collaborator` | `qwerty` | Collaborator | Criar, **visualizar** e cancelar os seus próprios pedidos de férias |
 
 ---
 
@@ -171,7 +171,8 @@ Os utilizadores são importados automaticamente pelo Keycloak no arranque via `k
 - Dashboard com estatísticas da sua equipa
 
 ### Collaborator
-- Criar novos pedidos de férias (requer o UUID do registo criado pelo admin)
+- **Visualizar os seus próprios pedidos de férias** via `GET /api/vacations/my`
+- Criar novos pedidos (requer o UUID do registo criado pelo admin)
 - Cancelar pedidos pendentes próprios
 - Dashboard pessoal
 
@@ -264,6 +265,7 @@ Documentação interativa disponível em **http://localhost:8081/swagger-ui.html
 | Método | Endpoint | Role | Descrição |
 |--------|----------|------|-----------|
 | `POST` | `/api/vacations/employee/{employeeId}` | COLLABORATOR | Criar pedido |
+| `GET` | `/api/vacations/my` | COLLABORATOR | **Listar os próprios pedidos** (usa o `sub` do JWT) |
 | `GET` | `/api/vacations` | ADMIN, MANAGER | Listar todos os pedidos |
 | `PATCH` | `/api/vacations/{id}/approve` | ADMIN, MANAGER | Aprovar pedido |
 | `PATCH` | `/api/vacations/{id}/reject` | ADMIN, MANAGER | Rejeitar pedido |
@@ -301,8 +303,7 @@ Authorization: Bearer <access_token_keycloak>
 
 | Limitação | Contexto |
 |-----------|----------|
-| `GET /api/vacations` requer ADMIN ou MANAGER | Colaboradores não conseguem listar os seus próprios pedidos via API |
-| Sem endpoint `/api/employees/me` | Colaborador precisa que o admin crie o seu registo e comunique o UUID |
+| Sem endpoint `/api/employees/me` | Colaborador precisa que o admin crie o seu registo e comunique o UUID para criar pedidos |
 | Token refresh não implementado | O access token expira ao fim de ~5 minutos; novo login necessário |
 | `GET /api/employees` requer ADMIN | Managers não conseguem listar colaboradores directamente |
 

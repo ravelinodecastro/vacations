@@ -1,6 +1,6 @@
 import { auth } from '@/app/auth/auth';
 
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8081';
+const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8080';
 
 // Typed error that wraps backend ApiError responses
 export class ApiError extends Error {
